@@ -24,18 +24,20 @@ const store = {
   set(k, v) { try { localStorage.setItem(k, v); } catch { /* private mode */ } },
 };
 
-/* Navigation. The installed app routes on the URL hash; the standalone demo
-   (window.WKL_DEMO, set by demo-backend.js) keeps the route in memory, because
-   its host page does not let a framed page own the address bar. */
+/* Navigation. The app routes on the URL hash. A standalone demo
+   (window.WKL_DEMO, set by demo-backend.js) built for a host that frames the
+   page and keeps the address bar to itself uses routing "memory" instead.
+   A demo hosted as its own site (GitHub Pages) uses the hash like the app. */
 const DEMO = !!window.WKL_DEMO;
+const MEMORY_NAV = DEMO && window.WKL_DEMO.routing === "memory";
 const nav = {
   memory: "#/",
-  get hash() { return DEMO ? this.memory : location.hash; },
+  get hash() { return MEMORY_NAV ? this.memory : location.hash; },
   /** Change the address without visiting it (keeps a view's state shareable). */
-  set(h) { if (DEMO) this.memory = h; else history.replaceState(null, "", h); },
+  set(h) { if (MEMORY_NAV) this.memory = h; else history.replaceState(null, "", h); },
   /** Visit a route. */
   go(h, { replace = false } = {}) {
-    if (DEMO) { this.memory = h; router(); }
+    if (MEMORY_NAV) { this.memory = h; router(); }
     else if (replace) location.replace(h);
     else location.hash = h;
   },
@@ -1254,7 +1256,7 @@ async function boot() {
     if (e.key === "/" && !e.target.matches("input, textarea, select, [contenteditable]")) { e.preventDefault(); $("#global-search").focus(); }
   });
   window.addEventListener("beforeunload", (e) => { if (state.dirty) { e.preventDefault(); e.returnValue = ""; } });
-  if (DEMO) {
+  if (MEMORY_NAV) {
     // In-page links ("#/…") are handled here instead of by the address bar.
     document.addEventListener("click", (e) => {
       const a = e.target.closest('a[href^="#/"]');
@@ -1262,6 +1264,10 @@ async function boot() {
       e.preventDefault();
       nav.go(a.getAttribute("href"));
     });
+  } else {
+    window.addEventListener("hashchange", () => { document.title = "World Knowledge Library"; router(); });
+  }
+  if (DEMO) {
     const foot = $(".rail-foot");
     foot.insertAdjacentHTML("afterbegin", renderVal(html`<p class="demo-note">This is a demo sandbox: it runs in your browser and keeps your changes on this device only.</p>
       <button class="btn btn-quiet btn-s" id="demo-reset" type="button">Reset the demo</button>`));
@@ -1273,8 +1279,6 @@ async function boot() {
       nav.go("#/");
       toast("The demo is back to its example collection");
     });
-  } else {
-    window.addEventListener("hashchange", () => { document.title = "World Knowledge Library"; router(); });
   }
   try {
     state.meta = await api("GET", "/api/meta");
