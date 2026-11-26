@@ -620,5 +620,5 @@
     return new Response(JSON.stringify(data), { status, headers: { "Content-Type": "application/json" } });
   };
 
-  window.WKL_DEMO = { reset };
+  window.WKL_DEMO = { reset, routing: SEED.routing === "hash" ? "hash" : "memory" };
 })();

@@ -29,3 +29,21 @@ def test_demo_page_is_self_contained():
     assert json.loads(seed)["archive"]["format"] == "world-knowledge-library"
     fragment = build_demo.build(fragment=True)
     assert "<html" not in fragment and "<title>World Knowledge Library</title>" in fragment
+
+
+def _seed_of(page):
+    return json.loads(re.search(r"window\.WKL_SEED = (\{.*?\});</script>", page, re.S).group(1))
+
+
+def test_routing_defaults():
+    assert _seed_of(build_demo.build())["routing"] == "hash"
+    assert _seed_of(build_demo.build(fragment=True))["routing"] == "memory"
+    assert _seed_of(build_demo.build(routing="memory"))["routing"] == "memory"
+
+
+def test_site_folder(tmp_path, monkeypatch):
+    monkeypatch.setattr("sys.argv", ["build_demo.py", "--site", str(tmp_path / "site")])
+    assert build_demo.main() == 0
+    site = tmp_path / "site"
+    assert {p.name for p in site.iterdir()} == {"index.html", "favicon.svg", ".nojekyll"}
+    assert '<link rel="icon" href="favicon.svg"' in (site / "index.html").read_text(encoding="utf-8")

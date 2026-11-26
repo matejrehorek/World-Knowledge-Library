@@ -7,7 +7,13 @@ library so both always agree.
 
     python scripts/build_demo.py                 # writes dist/demo.html
     python scripts/build_demo.py -o site.html    # choose the output file
+    python scripts/build_demo.py --site _site    # a folder ready for static hosting (GitHub Pages)
     python scripts/build_demo.py --fragment      # body-only markup for hosts that add their own <html>
+
+Routing: a page that owns its address bar routes on the URL hash, so the Back
+button works and views can be bookmarked. A fragment is meant for hosts that
+frame the page and keep the address bar to themselves, so it keeps the current
+view in memory instead. --routing overrides either default.
 """
 
 from __future__ import annotations
@@ -15,6 +21,7 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import shutil
 import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -138,12 +145,13 @@ def script_safe(text: str) -> str:
     return re.sub(r"</(script)", r"<\\/\1", text, flags=re.I)
 
 
-def build(fragment: bool = False) -> str:
+def build(fragment: bool = False, routing: str | None = None, favicon: str | None = None) -> str:
     index = (STATIC / "index.html").read_text(encoding="utf-8")
     css = (STATIC / "styles.css").read_text(encoding="utf-8")
     app = (STATIC / "app.js").read_text(encoding="utf-8")
     backend = (STATIC / "demo-backend.js").read_text(encoding="utf-8")
-    seed = {"meta": meta(), "archive": build_seed(), "version": __version__}
+    routing = routing or ("memory" if fragment else "hash")
+    seed = {"meta": meta(), "archive": build_seed(), "version": __version__, "routing": routing}
 
     body = re.search(r"<body>(.*)</body>", index, re.S).group(1)
     body = body.replace('<script src="app.js"></script>', "").strip()
@@ -152,6 +160,7 @@ def build(fragment: bool = False) -> str:
         "<title>World Knowledge Library</title>",
         '<meta name="description" content="A living library for everything you read, watch, '
         'learn and think. Interactive demo.">',
+        *([f'<link rel="icon" href="{favicon}" type="image/svg+xml">'] if favicon else []),
         *fonts,
         f"<style>\n{css}\n</style>",
     ])
@@ -170,12 +179,24 @@ def build(fragment: bool = False) -> str:
 def main() -> int:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("-o", "--output", default=str(ROOT / "dist" / "demo.html"))
+    p.add_argument("--site", metavar="DIR",
+                   help="write DIR/index.html plus the favicon, ready for static hosting")
     p.add_argument("--fragment", action="store_true",
                    help="omit <html>/<head>/<body> for hosts that wrap the page themselves")
+    p.add_argument("--routing", choices=["hash", "memory"],
+                   help="how views are addressed (default: hash, or memory with --fragment)")
     a = p.parse_args()
-    out = Path(a.output)
-    out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(build(fragment=a.fragment), encoding="utf-8")
+    if a.site:
+        site = Path(a.site)
+        site.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(STATIC / "favicon.svg", site / "favicon.svg")
+        (site / ".nojekyll").touch()  # serve files as they are, with no Jekyll processing
+        out = site / "index.html"
+        out.write_text(build(routing=a.routing, favicon="favicon.svg"), encoding="utf-8")
+    else:
+        out = Path(a.output)
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(build(fragment=a.fragment, routing=a.routing), encoding="utf-8")
     print(f"Wrote {out} ({out.stat().st_size // 1024} KB)")
     return 0
 
