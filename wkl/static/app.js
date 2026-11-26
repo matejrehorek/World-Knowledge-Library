@@ -24,7 +24,23 @@ const store = {
   set(k, v) { try { localStorage.setItem(k, v); } catch { /* private mode */ } },
 };
 
-const state = { meta: null, stats: null, wings: [], dirty: false, lastHash: location.hash };
+/* Navigation. The installed app routes on the URL hash; the standalone demo
+   (window.WKL_DEMO, set by demo-backend.js) keeps the route in memory, because
+   its host page does not let a framed page own the address bar. */
+const DEMO = !!window.WKL_DEMO;
+const nav = {
+  memory: "#/",
+  get hash() { return DEMO ? this.memory : location.hash; },
+  /** Change the address without visiting it (keeps a view's state shareable). */
+  set(h) { if (DEMO) this.memory = h; else history.replaceState(null, "", h); },
+  /** Visit a route. */
+  go(h, { replace = false } = {}) {
+    if (DEMO) { this.memory = h; router(); }
+    else if (replace) location.replace(h);
+    else location.hash = h;
+  },
+};
+const state = { meta: null, stats: null, wings: [], dirty: false, lastHash: nav.hash };
 
 async function api(method, path, body) {
   const opts = { method, headers: {} };
@@ -51,11 +67,12 @@ function toast(message, { error = false, action, actionLabel } = {}) {
 }
 const fail = (e) => toast(e.message || String(e), { error: true });
 
-function confirmAction(title, body, yes) {
+function confirmAction(title, body, yes, no = "Keep it") {
   const dlg = $("#confirm");
   $("#confirm-title").textContent = title;
   $("#confirm-body").textContent = body;
   $("#confirm-yes").textContent = yes;
+  $("#confirm-no").textContent = no;
   return new Promise((resolve) => {
     dlg.addEventListener("close", () => resolve(dlg.returnValue === "yes"), { once: true });
     dlg.returnValue = "";
@@ -245,19 +262,21 @@ const routes = [
 ];
 let teardown = null;
 function parseHash() {
-  const h = location.hash.replace(/^#\/?/, "");
+  const h = nav.hash.replace(/^#\/?/, "");
   const [path, qs = ""] = h.split("?");
   return { path: decodeURIComponent(path), params: new URLSearchParams(qs) };
 }
 async function router() {
-  if (state.dirty && location.hash !== state.lastHash) {
-    if (!window.confirm("Leave without saving? Your changes to this scroll will be lost.")) {
-      history.replaceState(null, "", state.lastHash || "#/");
-      return;
-    }
+  if (state.dirty && nav.hash !== state.lastHash) {
+    const target = nav.hash;
+    nav.set(state.lastHash || "#/");
+    const leave = await confirmAction("Leave without saving?", "Your changes to this scroll will be lost.",
+      "Leave without saving", "Keep editing");
+    if (!leave) return;
     state.dirty = false;
+    nav.set(target);
   }
-  state.lastHash = location.hash;
+  state.lastHash = nav.hash;
   if (teardown) { teardown(); teardown = null; }
   const { path, params } = parseHash();
   for (const [re, fn, nav] of routes) {
@@ -321,7 +340,7 @@ function wireCapture(id, after) {
       const s = await capture(input.value);
       if (s) {
         input.value = "";
-        toast(`Docked “${s.title}” in the Harbor`, { action: () => (location.hash = `#/scroll/${s.id}`), actionLabel: "Open" });
+        toast(`Docked “${s.title}” in the Harbor`, { action: () => nav.go(`#/scroll/${s.id}`), actionLabel: "Open" });
         await refreshStats();
         after && after(s);
       }
@@ -491,7 +510,7 @@ async function viewPinakes(params) {
   };
   const load = async (append = false) => {
     const qs = current();
-    if (!append) { offset = 0; history.replaceState(null, "", `#/pinakes${qs.toString() ? "?" + qs : ""}`); state.lastHash = location.hash; }
+    if (!append) { offset = 0; nav.set(`#/pinakes${qs.toString() ? "?" + qs : ""}`); state.lastHash = nav.hash; }
     qs.set("limit", "40"); qs.set("offset", String(offset));
     try {
       const res = await api("GET", `/api/scrolls?${qs}`);
@@ -521,8 +540,8 @@ async function viewPinakes(params) {
 // ----------------------------------------------------------------- scroll
 async function viewByTitle(title) {
   const res = await api("GET", `/api/titles?q=${encodeURIComponent(title)}&limit=1`);
-  if (res.length && res[0].title.toLowerCase() === title.toLowerCase()) location.replace(`#/scroll/${res[0].id}`);
-  else location.replace(`#/new?title=${encodeURIComponent(title)}`);
+  if (res.length && res[0].title.toLowerCase() === title.toLowerCase()) nav.go(`#/scroll/${res[0].id}`, { replace: true });
+  else nav.go(`#/new?title=${encodeURIComponent(title)}`, { replace: true });
 }
 
 async function viewScroll(id) {
@@ -628,7 +647,7 @@ async function viewScroll(id) {
   $("#forget")?.addEventListener("click", async () => { try { await api("DELETE", `/api/scrolls/${s.id}/remember`); toast("No longer reviewed"); refreshStats(); router(); } catch (e) { fail(e); } });
   $("#burn").addEventListener("click", async () => {
     if (!(await confirmAction(`Remove “${s.title}”?`, "The scroll, its marginalia and its earlier versions will be removed for good. Links to it will show as unwritten.", "Remove for good"))) return;
-    try { await api("DELETE", `/api/scrolls/${s.id}`); toast("Removed from the shelves"); refreshStats(); location.hash = "#/pinakes"; } catch (e) { fail(e); }
+    try { await api("DELETE", `/api/scrolls/${s.id}`); toast("Removed from the shelves"); refreshStats(); nav.go("#/pinakes"); } catch (e) { fail(e); }
   });
   $("#mform").addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -778,7 +797,7 @@ async function viewEditor(id, params = new URLSearchParams()) {
       state.dirty = false;
       toast(id ? "Changes saved" : `Shelved as ${saved.call_number}`);
       refreshStats(); refreshWings();
-      location.hash = `#/scroll/${saved.id}`;
+      nav.go(`#/scroll/${saved.id}`);
     } catch (e) { fail(e); }
   };
   form.addEventListener("submit", (e) => { e.preventDefault(); save(); });
@@ -1059,7 +1078,7 @@ function startSky(g) {
   canvas.addEventListener("pointerup", () => {
     const clicked = drag && !moved ? drag : null;
     drag = null; panning = null; canvas.classList.remove("dragging");
-    if (clicked) location.hash = `#/scroll/${clicked.id}`;
+    if (clicked) nav.go(`#/scroll/${clicked.id}`);
   });
   canvas.addEventListener("pointerleave", () => { hover = null; tip.hidden = true; draw(); });
   canvas.addEventListener("wheel", (ev) => {
@@ -1126,7 +1145,7 @@ async function viewSerapeum() {
   const [stats, tags] = await Promise.all([api("GET", "/api/stats"), api("GET", "/api/tags")]);
   const maxKind = Math.max(1, ...Object.values(stats.by_kind));
   const maxMonth = Math.max(1, ...stats.monthly.map((m) => m.added + m.finished));
-  const origin = location.origin;
+  const origin = DEMO ? "" : location.origin;
   const bookmarklet = `javascript:(()=>{window.open('${origin}/#/new?url='+encodeURIComponent(location.href)+'&title='+encodeURIComponent(document.title)+'&text='+encodeURIComponent(String(getSelection()).slice(0,1500)),'_blank')})()`;
   mount(html`
     <h1>The Serapeum</h1>
@@ -1135,7 +1154,10 @@ async function viewSerapeum() {
       <div class="card">
         <h2>Make a copy</h2>
         <p>Download the whole library, with marginalia, review history and every earlier version, as one JSON archive. For a folder of Markdown files run <code>wkl export --markdown DIR</code>.</p>
-        <a class="btn btn-primary" href="/api/serapeum/export" download>Download the archive</a>
+        ${DEMO ? html`<button class="btn btn-primary" id="copy-archive" type="button">Copy the archive</button>
+          <p class="muted" style="margin:10px 0 0;font-size:13px">Paste it into a .json file, then bring it into the installed library with <code>wkl import</code>.</p>
+          <textarea id="archive-text" rows="6" readonly hidden aria-label="Archive JSON" style="margin-top:10px;font-size:12px"></textarea>`
+          : html`<a class="btn btn-primary" href="/api/serapeum/export" download>Download the archive</a>`}
       </div>
       <div class="card">
         <h2>Bring in an archive</h2>
@@ -1143,11 +1165,17 @@ async function viewSerapeum() {
         <label class="btn" for="importfile">Choose an archive…</label>
         <input id="importfile" type="file" accept="application/json,.json" class="sr-only">
       </div>
-      <div class="card">
+      ${DEMO ? html`<div class="card">
+        <h2>Keep it for real</h2>
+        <p>This sandbox lives in one browser. The installed library keeps everything in one file on your computer, reads links for you, and gives you the <code>wkl</code> command and a bookmark button for capturing any page.</p>
+        <pre class="install"><code>pip install -e .
+wkl demo
+wkl serve --open</code></pre>
+      </div>` : html`<div class="card">
         <h2>Capture from any page</h2>
         <p>Drag this button to your bookmarks bar. On any web page, select a passage if you like, then press it to open a new scroll with the link, title and passage filled in.</p>
         <a class="bookmarklet" id="bm" href="#">Dock in the Library</a>
-      </div>
+      </div>`}
       <div class="card">
         <h2>Shape of the collection</h2>
         <p>${plural(stats.scrolls, "scroll")}, ${plural(stats.marginalia, "note")} in the margins and ${plural(stats.revisions, "earlier version")} in the palimpsest.</p>
@@ -1170,9 +1198,17 @@ async function viewSerapeum() {
         <button class="btn btn-primary">Rename</button>
       </form>
     </section>
-    <p class="muted" style="margin-top:40px;font-size:13px">This library lives in <code>${state.meta.path}</code>. Version ${state.meta.version}.</p>`);
-  $("#bm").setAttribute("href", bookmarklet);
-  $("#bm").addEventListener("click", (e) => { e.preventDefault(); toast("Drag the button to your bookmarks bar instead of clicking it."); });
+    <p class="muted" style="margin-top:40px;font-size:13px">${DEMO ? "This sandbox lives only in this browser." : html`This library lives in <code>${state.meta.path}</code>.`} Version ${state.meta.version}.</p>`);
+  if (DEMO) {
+    $("#copy-archive").addEventListener("click", async () => {
+      const text = JSON.stringify(await api("GET", "/api/serapeum/export"), null, 2);
+      try { await navigator.clipboard.writeText(text); toast("Archive copied"); }
+      catch { const ta = $("#archive-text"); ta.hidden = false; ta.value = text; ta.focus(); ta.select(); toast("Select all and copy the archive below"); }
+    });
+  } else {
+    $("#bm").setAttribute("href", bookmarklet);
+    $("#bm").addEventListener("click", (e) => { e.preventDefault(); toast("Drag the button to your bookmarks bar instead of clicking it."); });
+  }
   $("#importfile").addEventListener("change", async (e) => {
     const file = e.target.files[0]; if (!file) return;
     try {
@@ -1208,7 +1244,7 @@ async function boot() {
   $("#search-form").addEventListener("submit", (e) => {
     e.preventDefault();
     const q = $("#global-search").value.trim();
-    location.hash = `#/pinakes${q ? "?q=" + encodeURIComponent(q) : ""}`;
+    nav.go(`#/pinakes${q ? "?q=" + encodeURIComponent(q) : ""}`);
   });
   $("#global-search").addEventListener("input", debounce(() => {
     const pq = $("#pq");
@@ -1218,7 +1254,28 @@ async function boot() {
     if (e.key === "/" && !e.target.matches("input, textarea, select, [contenteditable]")) { e.preventDefault(); $("#global-search").focus(); }
   });
   window.addEventListener("beforeunload", (e) => { if (state.dirty) { e.preventDefault(); e.returnValue = ""; } });
-  window.addEventListener("hashchange", () => { document.title = "World Knowledge Library"; router(); });
+  if (DEMO) {
+    // In-page links ("#/…") are handled here instead of by the address bar.
+    document.addEventListener("click", (e) => {
+      const a = e.target.closest('a[href^="#/"]');
+      if (!a || e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey) return;
+      e.preventDefault();
+      nav.go(a.getAttribute("href"));
+    });
+    const foot = $(".rail-foot");
+    foot.insertAdjacentHTML("afterbegin", renderVal(html`<p class="demo-note">This is a demo sandbox: it runs in your browser and keeps your changes on this device only.</p>
+      <button class="btn btn-quiet btn-s" id="demo-reset" type="button">Reset the demo</button>`));
+    $("#demo-reset").addEventListener("click", async () => {
+      if (!(await confirmAction("Reset the demo?", "Everything you added or changed in this sandbox is replaced by the example collection.", "Reset the demo", "Keep my changes"))) return;
+      window.WKL_DEMO.reset();
+      state.dirty = false;
+      await Promise.all([refreshStats(), refreshWings()]);
+      nav.go("#/");
+      toast("The demo is back to its example collection");
+    });
+  } else {
+    window.addEventListener("hashchange", () => { document.title = "World Knowledge Library"; router(); });
+  }
   try {
     state.meta = await api("GET", "/api/meta");
     $("#library-path").textContent = `v${state.meta.version}`;

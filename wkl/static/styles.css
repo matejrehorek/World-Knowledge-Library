@@ -100,10 +100,14 @@ mark { background: var(--mark-bg); color: inherit; border-radius: 2px; padding: 
 .nav .count-due { color: var(--flame-ink); background: var(--flame); border-radius: 999px; padding: 0 7px; font-weight: 700; font-size: 11px; line-height: 18px; }
 .rail-foot { margin-top: auto; display: flex; flex-direction: column; gap: 10px; padding: 0 8px; color: var(--text-faint); font-size: 12px; }
 .rail-foot button { justify-self: start; }
+.demo-note { margin: 0; font-size: 12px; line-height: 1.45; color: var(--text-soft); border-left: 2px solid var(--flame); padding-left: 8px; }
+pre.install { background: var(--bg-deep); border: 1px solid var(--line); border-radius: var(--radius-s); padding: 10px 12px; margin: 0; overflow-x: auto; }
+pre.install code { background: none; padding: 0; font-size: 13px; }
 
 .main { min-width: 0; }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 30; background: var(--bg); }
 .topbar {
-  position: sticky; top: 0; z-index: 20;
+  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20;
   display: flex; gap: 12px; align-items: center;
   padding: 12px clamp(16px, 4vw, 40px);
   background: color-mix(in srgb, var(--bg) 88%, transparent);
