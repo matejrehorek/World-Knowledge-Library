@@ -2,6 +2,9 @@
 
 *A living library for everything you read, watch, learn and think.*
 
+**[Try the live demo](https://matejrehorek.github.io/World-Knowledge-Library/)**: it runs in your
+browser with no install and comes with an example collection. Your changes stay on your device.
+
 The Great Library of Alexandria set out to hold a copy of every book in the known
 world. Ships docking in its harbour were searched for scrolls, which were copied for
 the shelves; Callimachus catalogued it all in the *Pinakes*; scholars of the Mouseion
