@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "world-knowledge-library"
+version = "1.0.0"
+description = "A living library for everything you read, watch, learn and think, in the spirit of Alexandria."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = []
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Environment :: Web Environment",
+    "Topic :: Text Processing :: Indexing",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7"]
+
+[project.scripts]
+wkl = "wkl.cli:main"
+
+[tool.setuptools]
+packages = ["wkl"]
+
+[tool.setuptools.package-data]
+wkl = ["static/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

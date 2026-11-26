@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>World Knowledge Library</title>
+  <meta name="description" content="A living library for everything you read, watch, learn and think.">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Commissioner:wght@400;500;600;700&family=Gentium+Book+Plus:ital,wght@0,400;0,700;1,400&display=swap">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="shell">
+    <aside class="rail" id="rail" aria-label="Library sections">
+      <a class="brand" href="#/">
+        <svg width="34" height="34" viewBox="0 0 32 32" aria-hidden="true">
+          <path class="lighthouse-beam" d="M16 9 L31 3 L31 15 Z" fill="var(--flame)" opacity=".7"/>
+          <path d="M13 11 h6 l1.6 15 h-9.2 Z" fill="var(--text)"/>
+          <rect x="12.6" y="7" width="6.8" height="4" rx="1" fill="var(--flame)"/>
+          <path d="M15 4.5 h2 l.8 2.5 h-3.6 Z" fill="var(--text)"/>
+          <path d="M8 26 h16 v2.2 H8 Z" fill="var(--text-soft)"/>
+          <path d="M12.6 16.5 h6.8 M12.2 21 h7.6" stroke="var(--bg-deep)" stroke-width="1.2"/>
+        </svg>
+        <span class="brand-name">World Knowledge Library<small>A living library</small></span>
+      </a>
+      <nav class="nav" id="nav">
+        <a href="#/" data-nav="atrium"><span class="glyph">⌂</span>Atrium</a>
+        <a href="#/harbor" data-nav="harbor"><span class="glyph">⚓</span>Harbor<small data-count="inbox"></small></a>
+        <a href="#/pinakes" data-nav="pinakes"><span class="glyph">☰</span>Pinakes<small data-count="scrolls"></small></a>
+        <a href="#/pharos" data-nav="pharos"><span class="glyph">✺</span>Pharos<span data-count="due"></span></a>
+        <a href="#/constellation" data-nav="constellation"><span class="glyph">✧</span>Constellation</a>
+        <a href="#/wings" data-nav="wings"><span class="glyph">🏛</span>Wings</a>
+        <a href="#/serapeum" data-nav="serapeum"><span class="glyph">⛁</span>Serapeum</a>
+      </nav>
+      <div class="rail-foot">
+        <button class="btn btn-quiet btn-s" id="theme-toggle" type="button">Switch to light reading</button>
+        <span id="library-path"></span>
+      </div>
+    </aside>
+
+    <div class="main">
+      <header class="topbar">
+        <button class="btn btn-quiet menu-btn" id="menu-btn" type="button" aria-controls="rail" aria-expanded="false">
+          <span aria-hidden="true">☰</span><span class="sr-only">Menu</span>
+        </button>
+        <form class="searchbox" id="search-form" role="search">
+          <label class="sr-only" for="global-search">Search the library</label>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+          <input id="global-search" type="search" autocomplete="off" placeholder="Search titles, notes, authors… try tag:history or kind:book">
+          <kbd>/</kbd>
+        </form>
+        <div class="actions">
+          <a class="btn btn-primary" href="#/new"><span aria-hidden="true">＋</span><span class="label">New scroll</span></a>
+        </div>
+      </header>
+      <main id="view" class="view" tabindex="-1"></main>
+    </div>
+  </div>
+
+  <dialog id="confirm">
+    <form method="dialog">
+      <h2 id="confirm-title"></h2>
+      <p id="confirm-body"></p>
+      <div class="row">
+        <button class="btn btn-danger" value="yes" id="confirm-yes"></button>
+        <button class="btn btn-quiet" value="no" id="confirm-no">Keep it</button>
+      </div>
+    </form>
+  </dialog>
+  <div class="toast-zone" id="toasts" role="status" aria-live="polite"></div>
+  <script src="app.js"></script>
+</body>
+</html>
